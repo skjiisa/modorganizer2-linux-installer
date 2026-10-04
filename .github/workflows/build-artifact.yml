@@ -67,3 +67,32 @@ jobs:
         with:
           name: redirector_artifact
           path: dist/mo2-redirector.exe
+
+  # ARM64 Linux (e.g. the Valve Steam Frame). The Windows redirector is reused
+  # from the x86_64 job, which builds it with Wine.
+  build-aarch64:
+    runs-on: ubuntu-24.04-arm
+    needs: build
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+
+      - name: Download REDIRECTOR Artifact
+        uses: actions/download-artifact@v8
+        with:
+          name: redirector_artifact
+          path: dist
+
+      - name: Build Artifact
+        run: |
+          make nxm-handler mo2-lint_only
+          mv dist/mo2-lint dist/mo2-lint-aarch64
+
+      - name: Upload MO2-LINT Artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: mo2-lint-aarch64_artifact
+          path: dist/mo2-lint-aarch64
