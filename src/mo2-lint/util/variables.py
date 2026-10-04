@@ -906,6 +906,19 @@ def load_resource_info(path: Path | None = None):
     resources = {}
     for key, value in yml.get("resources", {}).items():
         resources[key] = Resource.from_dict(value)
+
+    # A refreshed config can predate resources this version needs, so fill gaps from the bundled copy
+    bundled = internal_file("cfg", "resource_info.yml")
+    if path.resolve() != bundled.resolve():
+        with open(bundled, "r", encoding="utf-8") as file:
+            defaults = yaml.load(file.read(), yaml.SafeLoader)
+        for key, value in defaults.get("resources", {}).items():
+            if key not in resources:
+                logger.debug(
+                    f"Resource '{key}' missing from {path}; using bundled default"
+                )
+                resources[key] = Resource.from_dict(value)
+
     resource_info = ResourceInfo(
         mod_organizer=resources.get("mod_organizer"),
         winetricks=resources.get("winetricks"),

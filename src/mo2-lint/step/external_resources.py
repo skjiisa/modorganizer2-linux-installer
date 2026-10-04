@@ -274,9 +274,16 @@ def download_cabextract(sevenzip: Path) -> Path | None:
                 subprocess.run(
                     [str(sevenzip), "x", str(downloaded), f"-o{tmp}", "-y", "-bso0"],
                     check=True,
+                    capture_output=True,
+                    text=True,
                 )
                 with tarfile.open(Path(tmp) / downloaded.stem) as archive:
                     archive.extract(str(resource.path_internal), root, filter="data")
+        except subprocess.CalledProcessError as e:
+            logger.warning(
+                f"{sevenzip} could not decompress {downloaded}: {(e.stderr or '').strip()}"
+            )
+            return None
         except Exception:
             logger.exception(f"Failed to extract cabextract from {downloaded}")
             return None
@@ -299,17 +306,24 @@ def download_archive_tools():
 
     logger.info(f"Not found on host, downloading: {', '.join(missing)}")
     tools_dir.mkdir(parents=True, exist_ok=True)
-    sevenzip = download_7zip()
-    if sevenzip:
-        binaries = {"7z": sevenzip}
-        if "cabextract" in missing:
-            binaries["cabextract"] = download_cabextract(sevenzip)
-        for tool in missing:
-            if binaries.get(tool):
-                link = tools_dir / tool
-                link.unlink(missing_ok=True)
-                link.symlink_to(binaries[tool])
-                logger.trace(f"Linked {link} to {binaries[tool]}")
+    binaries = {}
+    if "7z" in missing:
+        sevenzip = binaries["7z"] = download_7zip()
+    else:
+        sevenzip = Path(shutil.which("7z"))
+    if "cabextract" in missing:
+        cabextract = download_cabextract(sevenzip) if sevenzip else None
+        if not cabextract and "7z" not in missing:
+            # Older host builds (e.g. p7zip 16.02) can't read zstd, so retry with official 7-Zip
+            sevenzip = download_7zip()
+            cabextract = download_cabextract(sevenzip) if sevenzip else None
+        binaries["cabextract"] = cabextract
+    for tool, binary in binaries.items():
+        if binary:
+            link = tools_dir / tool
+            link.unlink(missing_ok=True)
+            link.symlink_to(binary)
+            logger.trace(f"Linked {link} to {binary}")
 
     missing = [tool for tool in missing if not shutil.which(tool)]
     if missing:
