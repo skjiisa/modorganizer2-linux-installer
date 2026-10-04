@@ -751,6 +751,10 @@ class ResourceInfo:
         Resource instance for the x86 VC++ Redistributable.
     vcredist_x64 : Resource, optional
         Resource instance for the x64 VC++ Redistributable.
+    sevenzip : Resource, optional
+        Resource instance for 7-Zip, used when 7z is not installed on the host.
+    cabextract : Resource, optional
+        Resource instance for cabextract, used when it is not installed on the host.
 
     Raises
     -------
@@ -763,6 +767,8 @@ class ResourceInfo:
     java: Resource | None = None
     vcredist_x86: Resource | None = None
     vcredist_x64: Resource | None = None
+    sevenzip: Resource | None = None
+    cabextract: Resource | None = None
 
     @classmethod
     def from_dict(cls, data: "dict[str, any] | ResourceInfo") -> "ResourceInfo":
@@ -777,6 +783,12 @@ class ResourceInfo:
             else None,
             vcredist_x64=Resource.from_dict(data.get("vcredist_x64"))
             if "vcredist_x64" in data
+            else None,
+            sevenzip=Resource.from_dict(data.get("sevenzip"))
+            if "sevenzip" in data
+            else None,
+            cabextract=Resource.from_dict(data.get("cabextract"))
+            if "cabextract" in data
             else None,
         )
 
@@ -900,6 +912,8 @@ def load_resource_info(path: Path | None = None):
         java=resources.get("java"),
         vcredist_x86=resources.get("vcredist_x86"),
         vcredist_x64=resources.get("vcredist_x64"),
+        sevenzip=resources.get("sevenzip"),
+        cabextract=resources.get("cabextract"),
     )
     logger.trace(f"Loaded resource_info: {resource_info}")
 

@@ -1,8 +1,13 @@
 #!/usr/bin/env python3
 
 import json
+import os
+import shutil
 import ssl
 import stat
+import subprocess
+import tarfile
+import tempfile
 from pathlib import Path
 from shutil import copyfile as copy
 from shutil import copytree, rmtree
@@ -28,6 +33,7 @@ ssl_context = ssl.create_default_context(cafile=certifi.where())
 cache_dir: Path = Path("~/.cache/mo2-lint").expanduser()
 download_dir = cache_dir / "downloads"
 extract_dir = download_dir / "extracted"
+tools_dir = download_dir / "bin"
 
 
 def install_theme(theme_slug: str, destination: Path) -> bool:
@@ -188,6 +194,129 @@ def download_winetricks():
     if downloaded:
         downloaded.chmod(downloaded.stat().st_mode | stat.S_IEXEC)
     logger.success("Winetricks download complete.")
+
+
+def add_tools_to_path():
+    """
+    Appends the downloaded tools directory to PATH, so host-installed tools take priority.
+    """
+    path = os.environ.get("PATH", "")
+    if str(tools_dir) not in path.split(os.pathsep):
+        os.environ["PATH"] = os.pathsep.join(filter(None, (path, str(tools_dir))))
+        logger.trace(f"Added {tools_dir} to PATH")
+
+
+def download_7zip() -> Path | None:
+    """
+    Runs the download process for the official static 7-Zip build.
+
+    Returns
+    -------
+    Path
+        The path to the 7-Zip executable, or None if it could not be downloaded.
+    """
+    resource = var.resource_info.sevenzip
+    if not resource:
+        logger.error("No sevenzip resource configured in resource_info.yml.")
+        return None
+
+    logger.info("Starting download process for 7-Zip")
+    downloaded = dl(resource.download_url, download_dir, checksum=resource.checksum)
+    if not downloaded:
+        logger.error("Failed to download 7-Zip.")
+        return None
+
+    root = extract_dir / "7zip" / downloaded.stem
+    binary = root / resource.path_internal
+    if not binary.exists():
+        try:
+            with tarfile.open(downloaded) as archive:
+                archive.extract(str(resource.path_internal), root, filter="data")
+        except Exception:
+            logger.exception(f"Failed to extract 7-Zip from {downloaded}")
+            return None
+    binary.chmod(binary.stat().st_mode | stat.S_IEXEC)
+    logger.success("7-Zip download complete.")
+    return binary
+
+
+def download_cabextract(sevenzip: Path) -> Path | None:
+    """
+    Runs the download process for cabextract.
+
+    Parameters
+    ----------
+    sevenzip : Path
+        The 7-Zip executable used to decompress the zstd-compressed package.
+
+    Returns
+    -------
+    Path
+        The path to the cabextract executable, or None if it could not be downloaded.
+    """
+    resource = var.resource_info.cabextract
+    if not resource:
+        logger.error("No cabextract resource configured in resource_info.yml.")
+        return None
+
+    logger.info("Starting download process for cabextract")
+    downloaded = dl(resource.download_url, download_dir, checksum=resource.checksum)
+    if not downloaded:
+        logger.error("Failed to download cabextract.")
+        return None
+
+    root = extract_dir / "cabextract" / downloaded.stem
+    binary = root / resource.path_internal
+    if not binary.exists():
+        try:
+            # Python 3.13's tarfile can't read zstd, so let 7-Zip unwrap the tarball first
+            with tempfile.TemporaryDirectory() as tmp:
+                subprocess.run(
+                    [str(sevenzip), "x", str(downloaded), f"-o{tmp}", "-y", "-bso0"],
+                    check=True,
+                )
+                with tarfile.open(Path(tmp) / downloaded.stem) as archive:
+                    archive.extract(str(resource.path_internal), root, filter="data")
+        except Exception:
+            logger.exception(f"Failed to extract cabextract from {downloaded}")
+            return None
+    binary.chmod(binary.stat().st_mode | stat.S_IEXEC)
+    logger.success("cabextract download complete.")
+    return binary
+
+
+def download_archive_tools():
+    """
+    Ensures 7z and cabextract are available, downloading them if the host doesn't provide them.
+
+    Winetricks needs both to apply many tricks, and patool needs 7z to extract Mod Organizer 2.
+    """
+    add_tools_to_path()
+    missing = [tool for tool in ("7z", "cabextract") if not shutil.which(tool)]
+    if not missing:
+        logger.debug("7z and cabextract found on PATH")
+        return
+
+    logger.info(f"Not found on host, downloading: {', '.join(missing)}")
+    tools_dir.mkdir(parents=True, exist_ok=True)
+    sevenzip = download_7zip()
+    if sevenzip:
+        binaries = {"7z": sevenzip}
+        if "cabextract" in missing:
+            binaries["cabextract"] = download_cabextract(sevenzip)
+        for tool in missing:
+            if binaries.get(tool):
+                link = tools_dir / tool
+                link.unlink(missing_ok=True)
+                link.symlink_to(binaries[tool])
+                logger.trace(f"Linked {link} to {binaries[tool]}")
+
+    missing = [tool for tool in missing if not shutil.which(tool)]
+    if missing:
+        logger.critical(
+            f"Required tools could not be found or downloaded: {', '.join(missing)}. Please install them with your package manager and try again."
+        )
+        raise SystemExit(1)
 
 
 def download_java():

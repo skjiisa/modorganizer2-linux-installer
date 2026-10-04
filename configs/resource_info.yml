@@ -28,6 +28,19 @@ resources:
     version: "latest-autobuild"
     download_url: "https://raw.githubusercontent.com/Winetricks/winetricks/master/src/winetricks"
 
+  # Fallbacks for hosts without 7z or cabextract (e.g. SteamOS)
+  sevenzip:
+    version: "26.03"
+    download_url: "https://github.com/ip7z/7zip/releases/download/26.03/7z2603-linux-x64.tar.xz"
+    checksum: "dc99eff5008f1ab79bd7084c68513701547a808a89502bf4133683535ab3c695"
+    path_internal: "7zzs"
+
+  cabextract:
+    version: "1.11-3"
+    download_url: "https://archive.archlinux.org/packages/c/cabextract/cabextract-1.11-3-x86_64.pkg.tar.zst"
+    checksum: "89f90aa1aefd7215d4d78e656454dde49b29ca5d4526cdc4a8f1be1e07ac9a65"
+    path_internal: "usr/bin/cabextract"
+
   vcredist_x86:
     version: "14.44.35211"
     download_url: "https://download.visualstudio.microsoft.com/download/pr/7ebf5fdb-36dc-4145-b0a0-90d3d5990a61/0C09F2611660441084CE0DF425C51C11E147E6447963C3690F97E0B25C55ED64/VC_redist.x86.exe"
