@@ -22,7 +22,7 @@ parent: Getting Started
 
 ### ARM64 (e.g. Steam Frame)
 
-ARM64 Linux support currently requires a source build; published ARM64 releases are not available yet. Steam only runs the ARM64 builds of Proton there, so MO2-LINT uses `Proton 11.0 (ARM64)` by default.
+On ARM64 Linux, download `mo2-lint-aarch64` from the releases page instead of `mo2-lint`. Steam only runs the ARM64 builds of Proton there, so MO2-LINT uses `Proton 11.0 (ARM64)` by default.
 
 {: .note }
 > On the Steam Frame, MO2-LINT doesn't restart Steam after installing (Steam runs the whole VR session there). Reboot the headset afterwards so Steam picks up the new compatibility tool.
